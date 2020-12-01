@@ -24,14 +24,29 @@ week_12 <- shaming %>%
 **Prompt:** Create a fitted model object called `fit_1` using this formula or, if you want, a formula which you prefer. You are trying to model `age` as a function of various parameters.
 
 age ~ sex + solo + primary_02 + primary_04 + treatment + sex:solo
-                    
+```{r}
+fit_1 <- stan_glm(age ~ sex + solo + primary_02 + primary_04 + treatment + sex:solo,
+                  data = week_12, 
+                  refresh = 0)
+
+print(fit_1, details = FALSE, digits = 5)
+```
+
 * Is this a causal or predictive model? Why?
 
-* Interpret the fitted model. 
+This is a predictive model because it is attempting to predict a subjects age based on a number of indicator variables. Changing the variables does not cause the subjects age to change so this is not a causal model. 
+
+* Interpret the fitted model.
+
+The Intercept is the median age of females who does not live by herself and did not vote in the primary_02 and _04 elections and did not receive treatment. 
 
 * Should we keep all these variables? And the interaction term?
 
+Treatment was randomly assigned so it would not have any predictive capabilities on age. The interaction term is significant so we should keep it. It is worrisome that some of the treatment values are statisticantly significant. 
+
 * Are you surprised about the meaningfulness, or lack thereof, for the treatment variables?
+
+I am surprised they have any value at all. They are randomly assigned so they don't predictive capabilities on age so they should not be statistically significant. 
 
 
 
@@ -40,6 +55,43 @@ age ~ sex + solo + primary_02 + primary_04 + treatment + sex:solo
 
 **Prompt:** Provide a posterior probability distribution for the expected difference in ages between those who live alone and those who do not. (Hint: Given that we are asking for an expected value, use `posterior_epred()`.)
 
+age ~ sex + solo + primary_02 + primary_04 + treatment + sex:solo
+```{r}
+new_obs <- tibble(solo = c(TRUE, FALSE, TRUE, FALSE),
+                  sex = c("Male", "Male", "Female", "Female"),
+                  treatment = "Control", 
+                  primary_02 = "Yes", 
+                  primary_04 = "Yes")
+
+set.seed(9)
+
+p_epred <- posterior_epred(fit_1, newdata = new_obs) %>%
+  as_tibble() %>%
+  mutate_all(as.numeric) %>%
+  rename("soloMale" = `1`, 
+         "Male" = `2`,
+         "soloFemale" = `3`,
+         "Female" = `4`) %>%
+  mutate(causal_effect_male = soloMale - Male,
+         causal_effect_female = soloFemale - Female) %>%
+  pivot_longer(cols = 5:6,
+               names_to = "causal_effect")
+
+p_epred %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(aes(y = after_stat(count/sum(count)), fill = causal_effect),
+                 alpha = 0.5, 
+                 bins = 100,
+                 position = "identity") +
+  labs(title = "Posterior Distribution for Causal Effect of \n Living Alone on Age",
+       y = "Proportion",
+       x = "Causal Effect") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_bw() +
+  scale_fill_manual(name = "Causal Effect",
+                    labels = c("Female", "Male"),
+                    values = c("coral2", "cornflowerblue"))
+```
 
 
 
